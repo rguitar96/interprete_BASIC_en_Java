@@ -1,0 +1,5 @@
+10 INPUT "Imprimir A"; A
+20LET S$ = "Hola"
+30 LET A = 23.23E542
+40 IF A>5 THENGOTO 30
+50 END

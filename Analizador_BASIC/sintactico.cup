@@ -1,0 +1,394 @@
+package procesadores ;
+
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+import java.util.Scanner;
+import java.lang.Math.*;
+
+parser code  
+{:
+	public static void main (String argc[]) throws Exception{
+	String extension="";
+	String programa=argc[0]; 
+	
+	for (int i=programa.length()-4;i<programa.length();i++){
+			extension=extension+programa.charAt(i);
+		}
+		if(extension.equals(".bas")){
+			FileInputStream prog=new FileInputStream(programa);
+			Lexico y=new Lexico(prog);
+			SintacticoCup principal=new SintacticoCup(y);
+			
+			principal.parse();
+		} else { System.err.println("Error en la entrada: el archivo debe ser de extension .bas para poder analizarlo."); }
+	}
+	
+	public void syntax_error(Symbol s) {
+		System.err.println("Error de sintaxis. Linea: " +(s.left+1)+". Posicion en la linea: " +(s.right)+ ". Valor del token invalido: "+s.value+".");
+	}  
+	
+	public void report_fatal_error(String message, Object info) {
+		done_parsing();
+		report_error("Error incontrolable de sintaxis: "
+		+ "No se puede recuperar del error, analisis concluido. Informacion: - "
+		+ message + " ",(Symbol)info);
+		report_error("Finalizacion forzosa.", null);
+		System.exit(1);
+	}
+:}	
+
+action code
+{:
+	public class variableTDS {
+		private String tipo;
+		private String valor;
+		public variableTDS(String tipo, String valor) {
+			this.tipo=tipo;
+			this.valor=valor;
+		}
+		public String getTipo(){
+			return tipo;
+		}
+		public String getValor(){
+			return valor;
+		}
+	}
+	
+	//atributos TDS: nombre, tipo, valor
+	Hashtable<String, variableTDS> tablaSimbolos = new Hashtable<String, variableTDS>();
+	boolean primera = true;
+	int lineaActual = 0;
+	Arbol arbol;
+	NodoRaiz nodoRaiz;
+	public void lineaValida(String ent, int i) {
+		ent = ent.replace("\n", "");
+		int n = Integer.parseInt(ent);
+		
+		if (n<=lineaActual) {System.err.println("El indicador de linea " + n + " en la linea " + i + " no es secuencial.");
+		} else { lineaActual=n;}
+	}
+
+	
+	public boolean variableAlmacenada(String variable) {
+		if (tablaSimbolos.containsKey(variable)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+	
+	public void introducirVariableTDS(String variable, String valor) {
+	
+		if (!variableAlmacenada(variable)) {
+			String tipo;
+			
+			switch (variable.length()) {
+			case 1:  
+						tipo = "numerica";
+						tablaSimbolos.put(variable, new variableTDS(tipo, valor));
+				break;
+			case 2: if (valor.length()<19) {
+						tipo = "cadena";
+						tablaSimbolos.put(variable, new variableTDS(tipo, valor));
+						} else {
+							System.err.println("Error semantico, las variables deben ser como maximo de 18 caracteres.");
+							
+							}
+				
+				break;
+			case 3: tipo = "funcion";
+				tablaSimbolos.put(variable, new variableTDS(tipo, valor));
+				break;
+			default: tipo = "suscrita";
+				tablaSimbolos.put(variable, new variableTDS(tipo, valor));
+				break;
+			}
+			
+		} else {
+			System.err.println("Se ha declarado una variable de nuevo.");
+		}
+	}
+	
+	public boolean comprobarEntero(String s) {
+		try {
+			Long.parseLong(s);
+			return true;
+		} catch (Exception e) {
+			return false;
+		}
+	}
+	
+	public String tipoVar(String v) {
+	switch (v.length()) {
+			case 1: return "numerica";
+			case 2: return "cadena";
+			case 3: return "funcion";
+			default: return "suscrita";
+			}
+	}
+	public String tipoConst(String c) {
+		
+		try {
+			Double.parseDouble(c);
+			return "numerica";
+		} catch (Exception e) {
+			if (c == null) { return "null";} else {return "cadena";}
+		}
+	}
+	
+	public boolean comprobarLogaritmo(String s) {
+		try {
+			if (Double.parseDouble(s)>0) {return true;} else { return false;}
+		} catch (Exception e) {
+			return false;
+		}
+	}
+	public boolean comprobarRaiz(String s) {
+		try {
+			if (Double.parseDouble(s)>=0) {return true;} else { return false;}
+		} catch (Exception e) {
+			return false;
+		}
+	}
+	
+	public boolean esEntero(String o) {
+		try {
+			Double.parseDouble(o);
+			return true;
+		} catch (Exception e) {
+			if ((tablaSimbolos.containsKey(o))&&(tablaSimbolos.get(o).getTipo()=="numerica")) {
+				return true;
+			} else {
+				return false;
+			}
+		}
+	}
+	
+	public void finAnalisis(){
+		System.out.println("**************FIN DEL ANALIZADOR SINTACTICO**************");
+		imprimirTablaSimbolos();
+		
+	}
+	
+	public void imprimirTablaSimbolos(){
+
+		System.out.println("______________________________________________________\n");
+		System.out.println("NOMBRE\t\t\tVALOR\t\t\tTIPO");
+		System.out.println("______________________________________________________\n");
+		Enumeration en  = tablaSimbolos.keys();
+		
+		while(en.hasMoreElements()){
+		
+			String siguiente = en.nextElement().toString();
+			variableTDS variable = tablaSimbolos.get(siguiente);
+			
+			if (variable.getTipo() == "numerica") {
+				System.out.println(siguiente+"\t\t\t"+variable.getTipo()+"\t\t"+variable.getValor()+"\n");
+			} else {
+				System.out.println(siguiente+"\t\t\t"+variable.getTipo()+"\t\t\t"+variable.getValor()+"\n");
+			}
+			
+		}
+}
+:}
+
+terminal		String constante, variable, entrada;
+terminal		String menor, mayor, menor_igual, mayor_igual, igual, no_igual;
+terminal		String abs, atn, cos, exp, t_int, log, sgn, sin, sqr, tan, rnd;
+terminal		String potencia, multiplicacion, division, suma, resta;
+terminal		String data, def, dim, end, t_for, gosub, t_goto, t_if;
+terminal		String input, let, next, on, print, randomize, read, restore, t_return;
+terminal		String step, stop, then, to, fnx, rem;
+terminal		String parentesis_izq, parentesis_dch, coma, punto_coma, eof;
+
+
+non terminal	SentenciaNext, Programa, Comparacion, Funcion, Operador;
+non terminal	Operacion, Expresion;
+non terminal	Sentencia, SentenciaDef, SentenciaLet, SentenciaControl, SentenciaGoto;
+non terminal	SentenciaIf, SentenciaGosub, SentenciaOn, SentenciaStop, SentenciaFor;
+non terminal	SentenciaPrint, SentenciaInput, SentenciaData, SentenciaRead, SentenciaRestore;
+non terminal	SentenciaDim, SentenciaRem, SentenciaRandomize;
+non terminal	S, RestoFunciones, ParametroFuncion, ExtenderExp, CuerpoFuncion, SentenciasReturn;
+non terminal	MasEntradas, SalidaTexto, MasExpresiones, MasVariables, MasConstantes;
+non terminal	Matriz2, MasDim, Step, SentenciasNext, InputVar, Operacion1, Operacion2;
+
+start with Programa;
+Programa		::= Sentencia Programa | entrada {:finAnalisis();:} end ;
+
+Sentencia		::= entrada:ENT {:
+								lineaValida(ENT, ENTleft+2); 
+								if (primera) {
+									nodoRaiz = new NodoRaiz(); 
+									arbol = new Arbol(nodoRaiz); 
+									primera = false; } 
+								:} S 
+					| error:e {:System.out.println("Error al comienzo de linea: todas las lineas deben comenzar con un numero de linea.");:} ;
+
+S				::= SentenciaDef | SentenciaLet | SentenciaControl | SentenciaFor 
+					| SentenciaPrint | SentenciaInput | SentenciaData | SentenciaRead 
+					| SentenciaRestore | SentenciaDim | SentenciaRandomize | SentenciaRem 
+					| SentenciaNext | error {:System.err.println("Sentencia invalida, se ha detectado una estructura invalida despues del numero de linea.");:};
+
+
+
+Comparacion		::= menor:e {: RESULT = e; :} | mayor | menor_igual | mayor_igual 
+					| igual | no_igual ;
+Funcion			::= log parentesis_izq Operador:o parentesis_dch {:
+																if (!comprobarLogaritmo((String) o)) System.err.println("Error semantico en linea "+(oleft+1)+", la funcion logaritmo no acepta numeros menores o iguales a 0");:}
+					| sqr parentesis_izq Operador:o parentesis_dch {:if (!comprobarRaiz((String) o)) System.err.println("Error semantico en linea "+(oleft+1)+", la funcion raiz cuadrada no acepta numeros menores a 0");:} | RestoFunciones ;
+RestoFunciones	::= abs ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| atn ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| cos ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| exp ParametroFuncion:o {:if (!esEntero((String) o)) {System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");
+												} else {
+													if (tablaSimbolos.containsKey((String) o)) {
+														if (Double.parseDouble(tablaSimbolos.get((String) o).getValor())>9999999) System.err.println("El valor de exponencial tiende a infinito.");
+													} else { if (Double.parseDouble((String) o)>9999999) System.err.println("El valor de exponencial tiende a infinito.");
+													} 
+													}
+												:} 
+					| t_int ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| sgn ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| sin ParametroFuncion:o {:if (!esEntero((String) o)) System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");:} 
+					| tan ParametroFuncion:o {:if (!esEntero((String) o)) {System.err.println("Error de sintaxis en la linea "+(oleft+1)+", el parametro de una funcion debe ser de tipo numerico");
+												} else {
+													if (tablaSimbolos.containsKey((String) o)) {
+														if ((Double.parseDouble(tablaSimbolos.get((String) o).getValor())%1.571)==0) System.err.println("El valor de tangente tiende a infinito.");
+													} else { if ((Double.parseDouble((String) o)%1.571)==0) System.err.println("El valor de tangente tiende a infinito.");
+													} 
+													}
+												:} ;
+ParametroFuncion::= parentesis_izq Operador:o parentesis_dch {:RESULT = o;:};
+
+Operador		::= constante:c {:RESULT = c;:} | variable:v {:
+								 if (variableAlmacenada(v)) {
+								 		RESULT = v;
+								 	} else {
+								 		System.err.println("Error semantico en la linea "+(vleft+1)+", la variable "+v+" no ha sido declarada");
+								 	}
+								 :} | rnd | Funcion ;
+
+Operacion		::= potencia | Operacion1 ;
+Operacion1		::= multiplicacion | division | Operacion2 ;
+Operacion2		::= suma | resta ;
+
+Expresion		::= parentesis_izq Operador:o ExtenderExp:e parentesis_dch{:
+																			RESULT = o;
+																			if ((tipoConst((String) e)=="cadena")&&((tipoConst((String) o)!="cadena")&&(o!=""))) System.err.println("Error semantico en la linea "+(oleft+1)+", en una operacion todos los tipos deben ser numericos.");
+																			:} | Operador:o ExtenderExp:e {:
+																											RESULT = o;
+																											if ((tipoConst((String) e)=="cadena")&&((tipoConst((String) o)!="cadena")&&(o!=""))) System.err.println("Error semantico en la linea "+(oleft+1)+", en una operacion todos los tipos deben ser numericos.");
+																											
+																											:};
+ExtenderExp		::= Operacion Expresion:e {:RESULT = e;:} | ;
+
+
+SentenciaRem	::= rem ;
+SentenciaDef	::= def fnx CuerpoFuncion 
+					| def:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de DEF.");:};
+CuerpoFuncion	::= parentesis_izq variable parentesis_dch igual Expresion | igual Expresion ;
+
+SentenciaLet	::=  let  variable:v igual Expresion:e   {:
+														if ((variableAlmacenada(v)) && (tipoVar(v) == tipoConst((String) e))) {
+															tablaSimbolos.remove(v);
+															
+															introducirVariableTDS(v, (String) e);
+														} else {
+															if (tipoVar(v) == tipoConst((String) e)) {
+															introducirVariableTDS(v, (String) e);
+															} else { 
+																if (esEntero(v)&&esEntero((String) e)) {
+																	tablaSimbolos.remove(v);
+																	introducirVariableTDS(v, (String) e);
+																} else {
+																	System.err.println("Error semantico en la linea "+(vleft+1)+", entrada no coincide con tipo de variable.");
+															}}
+														}
+														:}
+					| let:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de LET.");:};
+
+SentenciaControl::= SentenciaGoto | SentenciaIf | SentenciaGosub | SentenciaOn | SentenciaStop ;
+
+	SentenciaGoto	::= t_goto constante:c {:if (!comprobarEntero(c)) System.err.println("Error semantico, la linea referida en la linea "+(cleft+1)+" debe ser un entero positivo.");:} 
+		| t_goto:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de GOTO.");:};
+
+	SentenciaIf		::= t_if Expresion Comparacion Expresion  then  constante:c {:if (!comprobarEntero(c)) System.err.println("Error semantico, la linea referida en la linea "+(cleft+1)+" debe ser un entero positivo.");;:} 
+		|  t_if  Expresion Comparacion Expresion  then  SentenciaGoto;
+
+	SentenciaGosub	::= gosub constante:c SentenciasReturn {:if (!comprobarEntero(c)) System.err.println("Error semantico, la linea referida en la linea "+(cleft+1)+" debe ser un entero positivo.");;:} 
+		| gosub:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de GOSUB.");:};
+	SentenciasReturn::= Sentencia SentenciasReturn |  t_return ;
+
+	SentenciaOn		::= on  Expresion t_goto constante:c MasEntradas {:if (!comprobarEntero(c)) System.err.println("Error semantico, la linea referida en la linea "+(cleft+1)+" debe ser un entero positivo.");;:}
+		| on:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de ON.");:};
+	MasEntradas		::= coma constante:c {:if (!comprobarEntero(c)) System.err.println("Error semantico, la linea referida en la linea "+(cleft+1)+" debe ser un entero positivo.");;:} | ;
+
+	SentenciaStop	::= stop ;
+
+SentenciaPrint	::= print Expresion:e MasExpresiones InputVar:v {:
+															if (v == null) {
+															if (!variableAlmacenada((String) e)) {
+																System.err.println("Error semantico en la linea "+(eleft+1)+", variable "+e+" no declarada.");
+																} else { 
+																	}
+															} else {
+															if (!variableAlmacenada((String) v)) {
+																System.err.println("Error semantico en la linea "+(vleft+1)+", variable "+v+" no declarada.");
+																} else { 
+																	}}
+															:}
+					| print:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de PRINT.");:};
+MasExpresiones	::= coma Expresion | ;
+InputVar		::= punto_coma Expresion:v {:RESULT = v;:} | ;
+
+SentenciaInput	::= input SalidaTexto variable:v MasVariables {:
+												String entradaTeclado = "";
+												System.out.print("Introduzca el valor de la variable "+v);
+    										    Scanner entradaEscaner = new Scanner (System.in);
+    										    entradaTeclado = entradaEscaner.nextLine ();
+    										    if (tipoVar(v) == tipoConst(entradaTeclado)) {
+													introducirVariableTDS(v, entradaTeclado);
+												} else { System.err.println("Error semantico en la linea "+(vleft+1)+", entrada no coincide con tipo de variable.");
+												}
+												:} 
+					| input:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de INPUT");:} ;
+MasVariables	::= coma variable MasVariables | ;
+SalidaTexto		::= constante punto_coma | ;
+
+SentenciaData	::= data constante MasConstantes 
+					| data:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de DATA.");:};
+MasConstantes	::= coma constante | ;
+
+SentenciaRead	::=  read  variable:v MasVariables {:
+													if (!variableAlmacenada((String) v)) {
+														System.err.println("Error semantico en la linea "+(vleft+1)+", variable "+v+" no declarada.");
+														} else { 
+													}
+													:}
+					| read:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de READ.");:};
+
+SentenciaRestore::=  restore ;
+
+SentenciaDim	::= dim  variable:v parentesis_izq constante Matriz2 parentesis_dch MasDim {:
+																							if (!variableAlmacenada((String) v)) {
+																								System.err.println("Error semantico en la linea "+(vleft+1)+", variable "+v+" no declarada.");
+																								} else { 
+																							}
+																							:}
+					| dim:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de DIM.");:};
+MasDim			::= coma variable parentesis_izq constante Matriz2 parentesis_dch MasDim | ;
+Matriz2			::= coma constante | ;
+
+SentenciaFor	::= t_for variable:v igual Expresion:e to Expresion Step SentenciasNext:n  {:
+																							if (tipoVar(v) != tipoConst((String) e)) System.err.println("Error semantico en la linea "+(vleft+1)+", el tipo de la expresion no es igual al tipo de la constante.");
+																							if (!n.equals(v)) System.err.println("Error semantico en la linea "+(vleft+1)+", la variable en FOR y NEXT debe ser la misma.");
+																							:}
+					| t_for:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de FOR.");:};
+Step			::= step Expresion 
+			|  | step:l error {:System.err.println("Error sintactico en la linea "+(l+1)+", revisa la estructura de STEP.");:};
+SentenciasNext	::= Sentencia SentenciasNext:n {:RESULT = n;:} | entrada  next  variable:n {:RESULT = n;:} ;
+
+SentenciaRandomize::= randomize ;
+				
+
